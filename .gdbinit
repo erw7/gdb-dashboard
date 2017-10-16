@@ -5,7 +5,6 @@ python
 # https://github.com/cyrus-and/gdb-dashboard
 
 import ast
-import fcntl
 import os
 import re
 import struct
@@ -1527,6 +1526,8 @@ end
 # Better GDB defaults ----------------------------------------------------------
 
 set history save
+set history size 10000
+set history filename ~/.gdb_history
 set confirm off
 set verbose off
 set print pretty on
