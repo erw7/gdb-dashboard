@@ -9,9 +9,22 @@ import fcntl
 import os
 import re
 import struct
-import termios
+import sys
 import traceback
 import math
+
+if sys.platform != 'win32':
+    import fcntl
+    import termios
+else:
+    from ctypes import byref
+    from ctypes import c_short
+    from ctypes import c_ulong
+    from ctypes import pointer
+    from ctypes import POINTER
+    from ctypes import Structure
+    from ctypes import windll
+    from ctypes import wintypes
 
 # Common attributes ------------------------------------------------------------
 
@@ -59,11 +72,11 @@ which `{pid}` is expanded with the process identifier of the target program.""",
             # divider
             'divider_fill_char_primary': {
                 'doc': 'Filler around the label for primary dividers',
-                'default': '─'
+                'default': '-'
             },
             'divider_fill_char_secondary': {
                 'doc': 'Filler around the label for secondary dividers',
-                'default': '─'
+                'default': '-'
             },
             'divider_fill_style_primary': {
                 'doc': 'Style for `divider_fill_char_primary`',
@@ -125,6 +138,85 @@ which `{pid}` is expanded with the process identifier of the target program.""",
         }
 
 # Common -----------------------------------------------------------------------
+if sys.platform == 'win32':
+    class SmarllRect(Structure):
+        """
+        typedef struct _SMALL_RECT {
+        SHORT Left;
+        SHORT Top;
+        SHORT Right;
+        SHORT Bottom;
+        } SMALL_RECT;
+        """
+        _fields_ = [("Left", c_short),
+                    ("Top", c_short),
+                    ("Right", c_short),
+                    ("Bottom", c_short)]
+
+    class Coord(Structure):
+        """"
+        typedef struct _COORD {
+        SHORT X;
+        SHORT Y;
+        }
+        """
+        _fields_ = [("X", c_short),
+                    ("Y", c_short)]
+
+    class ConsoleScreenBufferInfo(Structure):
+        """"
+        typedef struct _CONSOLE_SCREEN_BUFFER_INFO {
+        COORD      dwSize;
+        COORD      dwCursorPosition;
+        WORD       wAttributes;
+        SMALL_RECT srWindow;
+        COORD      dwMaximumWindowSize;
+        }
+        """
+        _fields_ = [("dwSize", Coord),
+                    ("dwCursorPostion", Coord),
+                    ("wAttributes", wintypes.WORD),
+                    ("srWindow", SmarllRect),
+                    ("dwMaximumWindowSize", Coord)]
+
+class Console():
+    if sys.platform == 'win32':
+        STD_INPUT_HANDLE = wintypes.DWORD(-10)
+        STD_OUTPUT_HANDLE = wintypes.DWORD(-11)
+        STD_ERROR_HANDLE = wintypes.DWORD(-12)
+        is_win = True
+
+    else:
+        is_win = False
+
+    def __init__(self, fd=1):
+        if Console.is_win:
+            self._kernel32_ = windll.kernel32
+            self._getconsolescreenbufferinfo_ = self._kernel32_.GetConsoleScreenBufferInfo
+            self._getconsolescreenbufferinfo_.restype = wintypes.BOOL
+            self._getconsolescreenbufferinfo_.argtypes = [wintypes.HANDLE, POINTER(ConsoleScreenBufferInfo)]
+            self._getstdhandle_ = self._kernel32_.GetStdHandle
+            self._getstdhandle_.restype = wintypes.HANDLE
+            self._getstdhandle_.argtypes = [wintypes.DWORD]
+        else:
+            self.fd = fd
+
+    def width(self):
+        if Console.is_win:
+            width = 80
+            csbi = ConsoleScreenBufferInfo()
+            result = self._getconsolescreenbufferinfo_(self._getstdhandle_(Console.STD_OUTPUT_HANDLE), byref(csbi))
+            if not result:
+                return width
+            else:
+                width = csbi.srWindow.Right - csbi.srWindow.Left + 1
+                return width
+        else:
+            # first 2 shorts (4 byte) of struct winsize
+            raw = fcntl.ioctl(self.fd, termios.TIOCGWINSZ, ' ' * 4)
+            height, width = struct.unpack('hh', raw)
+            return width
+
 
 def run(command):
     return gdb.execute(command, to_string=True)
@@ -398,10 +490,8 @@ class Dashboard(gdb.Command):
 
     @staticmethod
     def get_term_width(fd=1):  # defaults to the main terminal
-        # first 2 shorts (4 byte) of struct winsize
-        raw = fcntl.ioctl(fd, termios.TIOCGWINSZ, ' ' * 4)
-        height, width = struct.unpack('hh', raw)
-        return int(width)
+        console = Console(fd)
+        return int(console.width())
 
     @staticmethod
     def set_custom_prompt(dashboard):
