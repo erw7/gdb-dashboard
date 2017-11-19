@@ -921,6 +921,9 @@ class Source(Dashboard.Module):
         return 'Source'
 
     def lines(self, term_width, style_changed):
+        # skip if the current thread is not stopped
+        if not gdb.selected_thread().is_stopped():
+            return []
         # try to fetch the current line (skip if no line information)
         sal = gdb.selected_frame().find_sal()
         current_line = sal.line
@@ -998,6 +1001,9 @@ instructions constituting the current statement are marked, if available."""
         return 'Assembly'
 
     def lines(self, term_width, style_changed):
+        # skip if the current thread is not stopped
+        if not gdb.selected_thread().is_stopped():
+            return []
         line_info = None
         frame = gdb.selected_frame()  # PC is here
         disassemble = frame.architecture().disassemble
@@ -1132,6 +1138,9 @@ location, if available. Optionally list the frame arguments and locals too."""
         return 'Stack'
 
     def lines(self, term_width, style_changed):
+        # skip if the current thread is not stopped
+        if not gdb.selected_thread().is_stopped():
+            return []
         # find the selected frame (i.e., the first to display)
         selected_index = 0
         frame = gdb.newest_frame()
@@ -1416,6 +1425,9 @@ class Registers(Dashboard.Module):
         return 'Registers'
 
     def lines(self, term_width, style_changed):
+        # skip if the current thread is not stopped
+        if not gdb.selected_thread().is_stopped():
+            return []
         # fetch registers status
         registers = []
         for reg_info in run('info registers').strip().split('\n'):
@@ -1495,7 +1507,10 @@ class Threads(Dashboard.Module):
     def lines(self, term_width, style_changed):
         out = []
         selected_thread = gdb.selected_thread()
-        selected_frame = gdb.selected_frame()
+        # do not restore the selected frame if the thread is not stopped
+        restore_frame = gdb.selected_thread().is_stopped()
+        if restore_frame:
+            selected_frame = gdb.selected_frame()
         for thread in gdb.Inferior.threads(gdb.selected_inferior()):
             is_selected = (thread.ptid == selected_thread.ptid)
             style = R.style_selected_1 if is_selected else R.style_selected_2
@@ -1514,7 +1529,8 @@ class Threads(Dashboard.Module):
             out.append(info)
         # restore thread and frame
         selected_thread.switch()
-        selected_frame.select()
+        if restore_frame:
+            selected_frame.select()
         return out
 
 class Expressions(Dashboard.Module):
