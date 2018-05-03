@@ -974,7 +974,7 @@ class Source(Dashboard.Module):
             if int(number) == current_line:
                 # the current line has a different style without ANSI
                 if R.ansi:
-                    if self.highlighted:
+                    if self.highlighted and not self.highlight_line:
                         line_format = ansi(number_format,
                                            R.style_selected_1) + ' {}'
                     else:
@@ -1002,6 +1002,12 @@ class Source(Dashboard.Module):
                 'name': 'tab_size',
                 'type': int,
                 'check': check_gt_zero
+            },
+            'highlight-line': {
+                'doc': 'Decide whether the whole current line should be highlighted.',
+                'default': False,
+                'name': 'highlight_line',
+                'type': bool
             }
         }
 
@@ -1108,7 +1114,7 @@ instructions constituting the current statement are marked, if available."""
                 indicator = ansi(indicator, R.style_selected_1)
                 opcodes = ansi(opcodes, R.style_selected_1)
                 func_info = ansi(func_info, R.style_selected_1)
-                if not highlighter.active:
+                if not highlighter.active or self.highlight_line:
                     text = ansi(text, R.style_selected_1)
             elif line_info and line_info.pc <= addr < line_info.last:
                 if not R.ansi:
@@ -1117,7 +1123,7 @@ instructions constituting the current statement are marked, if available."""
                 indicator = ansi(indicator, R.style_selected_2)
                 opcodes = ansi(opcodes, R.style_selected_2)
                 func_info = ansi(func_info, R.style_selected_2)
-                if not highlighter.active:
+                if not highlighter.active or self.highlight_line:
                     text = ansi(text, R.style_selected_2)
             else:
                 addr_str = ansi(addr_str, R.style_low)
@@ -1144,6 +1150,12 @@ instructions constituting the current statement are marked, if available."""
                 'doc': 'Function information visibility flag.',
                 'default': True,
                 'name': 'show_function',
+                'type': bool
+            },
+            'highlight-line': {
+                'doc': 'Decide whether the whole current line should be highlighted.',
+                'default': False,
+                'name': 'highlight_line',
                 'type': bool
             }
         }
