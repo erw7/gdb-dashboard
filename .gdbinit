@@ -571,6 +571,20 @@ class Dashboard(gdb.Command):
         dashboard.load_modules(modules)
         Dashboard.parse_inits(False)
         dashboard.inhibited = False
+        if sys.platform == 'win32':
+            from ctypes import byref, c_ulong, c_void_p, windll
+            GetStdHandle = windll.kernel32.GetStdHandle
+            SetConsoleMode = windll.kernel32.SetConsoleMode
+            GetConsoleMode = windll.kernel32.GetConsoleMode
+            INVALID_HANDLE_VALUE = -1
+            STD_OUTPUT_HANDLE = c_ulong(-11)
+            ENABLE_VIRTUAL_TERMINAL_PROCESSING = c_ulong(0x0004)
+            dwMode = c_ulong()
+            hStdOutPut = GetStdHandle(STD_OUTPUT_HANDLE)
+            if hStdOutPut != INVALID_HANDLE_VALUE:
+                if GetConsoleMode(hStdOutPut, byref(dwMode)) != 0:
+                    dwMode = c_ulong(dwMode.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING.value)
+                    SetConsoleMode(hStdOutPut, dwMode)
         # GDB overrides
         run('set pagination off')
         # display if possible (program running and not explicitly disabled by
